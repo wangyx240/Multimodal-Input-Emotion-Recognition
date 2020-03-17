@@ -12,6 +12,4 @@ def accuracy(output, target):
     # return correct / len(target)
     with torch.no_grad():
         _, idx = torch.max(output, 1, keepdim=True)
-        #print(target)
-        #print(idx.squeeze())
-    return sum(target.cpu().numpy() == idx.squeeze().cpu().numpy()), len(target)
+    return sum(target == idx.squeeze()), len(target)

@@ -1,6 +1,6 @@
 directory: './dataset/RAVDESS/'
 Tracking_path:  './dataset/RAVDESS/FacialTracking_Actors_01-24/'
-portion: 0.9
+portion: 0.8
 loss: cross_loss
 matrics: accuracy
 save_path: './savedmodel/'

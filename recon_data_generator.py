@@ -3,10 +3,9 @@ import torch
 from moviepy.editor import VideoFileClip
 from PIL import Image
 from torch.utils.data import Dataset, DataLoader
-import random
+
 from pathlib import Path
 import os
-import cv2
 
 import re
 #
@@ -22,43 +21,9 @@ Statement (01 = "Kids are talking by the door", 02 = "Dogs are sitting by the do
 Repetition (01 = 1st repetition, 02 = 2nd repetition).
     Actor (01 to 24. Odd numbered actors are male, even numbered actors are female).
 '''
-def get_faces(image, face_detector):
-    ''' Get faces information from image
-
-    Args:
-        image (array): Image to process
-        face_detector: loaded model for face detection
-
-    Returns:
-        bool: True if at least 1 face was found
-        array of vectors: one vector for each face (array of [0,0,confidence,x1,y1,x2,y2])
-    '''
-
-    success = True
-    blob = cv2.dnn.blobFromImage(image, 1.0, (300, 300), [104, 117, 123], False, False)
-    face_detector.setInput(blob)
-    faces = face_detector.forward()
-
-    if(faces.shape[2] == 0):
-        print("No faces were found")
-        success = False
-    return success, faces
 
 def transform(img):
-    modelFile = "models/opencv_face_detector_uint8.pb"
-    configFile = "models/opencv_face_detector.pbtxt"
-    face_detector = cv2.dnn.readNetFromTensorflow(modelFile, configFile)
-    success, faces = get_faces(img, face_detector)
-    for f in range(faces.shape[2]):
-        confidence = faces[0, 0, f, 2]
-        if confidence > 0.8:
-            x1 = int(faces[0, 0, f, 3] * img.shape[1])
-            y1 = int(faces[0, 0, f, 4] * img.shape[0])
-            x2 = int(faces[0, 0, f, 5] * img.shape[1])
-            y2 = int(faces[0, 0, f, 6] * img.shape[0])
-            detected_face = img[y1:y2, x1:x2]
-    return np.asarray(Image.fromarray(detected_face).convert('L').resize((192,180)))
-    #return np.asarray(Image.fromarray(img).convert('L').crop((256,0,1024,720)).resize((192,180)))
+    return np.asarray(Image.fromarray(img).crop((256,0,1024,720)).resize((192,180)))
 
 
 def clean_video_list(video_path):
@@ -68,53 +33,43 @@ def clean_video_list(video_path):
 
 
 def get_samples(sample_name):     # every pixel / 255   ???
-    # print(type(sample_name))
     clip = VideoFileClip(sample_name)
-    # audio = np.array(list(clip.audio.set_fps(16000).iter_frames())).mean(1)
+    audio = np.array(list(clip.audio.set_fps(16000).iter_frames())).mean(1)
     count = 0
-    # audio_sample_tuple = []
+    audio_sample_tuple = []
     frame_sample_tuple = []
     label_tuple = []
-    # sub_clip_frame = []
-    # sub_clip_audio = []
-    # frame_count = 0
+    sub_clip_frame = []
+    sub_clip_audio = []
+    frame_count = 0
     capture_size = True
     for frame in clip.iter_frames():
-        count += 1
-        if count % 5 == 0:
+        frame_count += 1
+        frame = transform(frame)
+        frame = frame / 255.
+        frame_audio = audio[count * 16000 // 30: count * 16000 // 30 + 533]
+        pattern = r'.+?-.+?-(.+?)-(.+?)-'
+        label = re.match(pattern, sample_name).groups()
 
-            frame = transform(frame)
-            frame = frame / 255.
-            mean=np.mean(frame)
-            print(mean)
-            #print(frame.shape)
-            #cv2.imshow('image', frame)
-            #cv2.waitKey(5000)
-            #print(frame)
-            # frame_audio = audio[count * 16000 // 30: count * 16000 // 30 + 533]
-            pattern = r'.+?-.+?-(.+?)-(.+?)-'
-            label = re.match(pattern, sample_name).groups()
-
-            # sub_clip_audio.append(frame_audio)
-            frame_sample_tuple.append(np.moveaxis(np.moveaxis(frame,-1,0),-1,-2))
-            # if frame_count == 15:
-            #     frame_count = 0
-            #     if capture_size:
-            #         audio_size = np.size(sub_clip_audio)
-            #         capture_size = False
-                # np.concatenate((np.expand_dims(np.array(sub_clip_frame), 0),
-                #                   np.expand_dims(np.array(sub_clip_frame), 0)),0)
-                # if not capture_size and np.size(sub_clip_audio) != audio_size:
-                #     break
-                # audio_sample_tuple.append(sub_clip_audio)
-                # frame_sample_tuple.append(sub_clip_frame)
-                # label_tuple.append([np.float64(label[0]), np.float64(label[1])])
+        sub_clip_audio.append(frame_audio)
+        sub_clip_frame.append(np.moveaxis(np.moveaxis(frame,-1,0),-1,-2))
+        if frame_count == 15:
+            frame_count = 0
+            if capture_size:
+                audio_size = np.size(sub_clip_audio)
+                capture_size = False
+            # np.concatenate((np.expand_dims(np.array(sub_clip_frame), 0),
+            #                   np.expand_dims(np.array(sub_clip_frame), 0)),0)
+            if not capture_size and np.size(sub_clip_audio) != audio_size:
+                break
+            audio_sample_tuple.append(sub_clip_audio)
+            frame_sample_tuple.append(sub_clip_frame)
+            # label_tuple.append([np.float64(label[0]), np.float64(label[1])])
             label_tuple.append(np.float64(label[0]))
             sub_clip_frame = []
-                # sub_clip_audio = []
-            # count += 1
-    # return np.array(audio_sample_tuple),np.array(frame_sample_tuple), np.array([i - 1 for i in label_tuple])
-    return np.array(frame_sample_tuple), np.array([i - 1 for i in label_tuple])
+            sub_clip_audio = []
+        count += 1
+    return np.array(audio_sample_tuple),np.array(frame_sample_tuple), np.array([i - 1 for i in label_tuple])
 
 
 class FrameDataSet(Dataset):                # return audio(1,15,533) frame(1,15,3,720,1280) label(1,2)
@@ -132,7 +87,6 @@ class FrameDataSet(Dataset):                # return audio(1,15,533) frame(1,15,
             for j in current_list:
                 self.full_file_name_list.append((self.directory + i + '/Actor_' + i[-2:] + '/' + j))
         portion = round(config['portion']*round(len(self.full_file_name_list)))
-        random.shuffle(self.full_file_name_list)
         if status == 'train':
             self.full_file_name_list = self.full_file_name_list[0:portion]
         elif status == 'eval':
@@ -140,12 +94,12 @@ class FrameDataSet(Dataset):                # return audio(1,15,533) frame(1,15,
         else:
             print('??????????????????WTF/????????????')
 # count = 1
-        for file_name in self.full_file_name_list:
-            # print(file_name)
-            temp_frame, temp_label = get_samples(file_name)
-            # self.full_data_set_audio = torch.cat((self.full_data_set_audio, torch.tensor(temp_audio)), 0)
-            self.full_data_set_frame = torch.cat((self.full_data_set_frame, torch.tensor(temp_frame)), 0)
-            self.full_label_set = torch.cat((self.full_label_set, torch.tensor(temp_label)), 0)
+# for file_name in self.full_file_name_list:
+#
+#     temp_audio, temp_frame, temp_label = get_samples(file_name)
+#     self.full_data_set_audio = torch.cat((self.full_data_set_audio, torch.tensor(temp_audio)), 0)
+#     self.full_data_set_frame = torch.cat((self.full_data_set_frame, torch.tensor(temp_frame)), 0)
+#     self.full_label_set = torch.cat((self.full_label_set, torch.tensor(temp_label)), 0)
 
             # if count ==1:
             #     self.full_data_set_audio,self.full_data_set_frame, self.full_label_set = get_samples(file_name)
@@ -172,14 +126,14 @@ class FrameDataSet(Dataset):                # return audio(1,15,533) frame(1,15,
         # pattern = r'.+?-.+?-(.+?)-(.+?)-'
         # label = re.match(pattern, file_name).groups()
         # return str(self.full_file_name_list[index]), label[0], label[1]
-        return self.full_data_set_frame[index], self.full_label_set[index]
+        return self.full_file_name_list[index]
 
 #
 # return self.full_data_set_audio[index], self.full_data_set_frame[index],
 #        self.full_label_set[index]
 
     def __len__(self):
-        return len(self.full_label_set)
+        return len(self.full_file_name_list)
 
 #
 # return self.full_label_set.shape[0]

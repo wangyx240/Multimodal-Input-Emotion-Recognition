@@ -150,7 +150,7 @@ class BottleneckWithCBAM(nn.Module):
 
 class ResNet(nn.Module):
 
-    def __init__(self, block, layers, num_classes=8, zero_init_residual=False,
+    def __init__(self, block, layers, num_classes=2048, zero_init_residual=False,
                  groups=1, width_per_group=64, replace_stride_with_dilation=None,
                  norm_layer=None):
         super(ResNet, self).__init__()
@@ -169,7 +169,7 @@ class ResNet(nn.Module):
                              "or a 3-element tuple, got {}".format(replace_stride_with_dilation))
         self.groups = groups
         self.base_width = width_per_group
-        self.conv1 = nn.Conv2d(1, self.inplanes, kernel_size=7, stride=2, padding=3,
+        self.conv1 = nn.Conv2d(3, self.inplanes, kernel_size=7, stride=2, padding=3,
                                bias=False)
         self.bn1 = norm_layer(self.inplanes)
         self.relu = nn.ReLU(inplace=True)
@@ -291,8 +291,8 @@ class RecurrentModel(nn.Module):
         self.optimizer = torch.optim.Adam([
                 {'params': self.lstm.parameters()},
                 {'params': self.linear.parameters()},
-                {'params': self.combine_model.audio_model.parameters(), 'lr': 0.000001},
-                {'params': self.combine_model.video_model.parameters(), 'lr': 0.000001}
+                {'params': self.combine_model.audio_model.parameters(), 'lr': 0.0001},
+                {'params': self.combine_model.video_model.parameters(), 'lr': 0.0001}
             ], lr=0.00001)
 
     def forward(self, audio_input, frame_input):
@@ -315,7 +315,6 @@ class RecurrentModel(nn.Module):
         # print(features.shape)
         # features = features.unsqueeze(1)
         features = features.view(self.seq_length,-1,self.input_size)
-        features = F.dropout(features)
         # print(features.shape)
         features, _ = self.lstm.forward(features)                       # features: hidden state [1,1,256]
         # print(features.shape)

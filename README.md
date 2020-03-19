@@ -1,6 +1,8 @@
-Prooject with JJ and Kuangyi
-It's the image only version
+# Multimodal Human Emotion recognition
+Prooject with JJ and Kuangyi. Using ravdess dataset.
+The model consists of two sigle modal network: image only and audio only.
 
-dataset is ravdess
-Use trainingtest.py to train 
-Use evalatt.py to test
+# How to run:
+Use trainingtest.py to train and use evalatt.py to test. 
+
+

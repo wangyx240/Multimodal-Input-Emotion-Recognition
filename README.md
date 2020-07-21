@@ -1,5 +1,5 @@
 # Multimodal Human Emotion recognition
-Prooject with JJ and Kuangyi. Using ravdess dataset.
+Project with JJ and Kuangyi. Using ravdess dataset.
 The model consists of two sigle modal network: image only and audio only.
 
 # How to run:
